@@ -1,0 +1,278 @@
+---
+# Kolla-Ansible Global Configuration
+# OpenStack 2024.1 (Caracal) Production Deployment
+# Author: rasheshpatel <rasheshkumar.patel@gmail.com>
+# Last updated: 2024-06-01
+
+###############################################################################
+# Base container image configuration
+###############################################################################
+
+# Base Linux distribution for Kolla containers
+kolla_base_distro: "ubuntu"
+
+# Install type: "source" builds from source, "binary" uses distro packages
+kolla_install_type: "source"
+
+# OpenStack release name (must match kolla-ansible package version)
+openstack_release: "2024.1"
+
+###############################################################################
+# Docker registry (optional — comment out to pull from Docker Hub / Quay.io)
+###############################################################################
+
+# docker_registry: "myregistry.example.com:5000"
+# docker_registry_username: "kolla"
+# docker_namespace: "openstack.kolla"
+# docker_registry_insecure: "no"
+
+###############################################################################
+# Networking — VIPs and FQDNs
+###############################################################################
+
+# Internal VIP: used for all internal service-to-service traffic
+# This address is managed by Keepalived across the three controller nodes
+kolla_internal_vip_address: "10.0.1.100"
+kolla_internal_fqdn: "openstack.internal.example.com"
+
+# External VIP: exposed to users (Horizon, public API endpoints)
+kolla_external_vip_address: "192.168.1.100"
+kolla_external_fqdn: "openstack.example.com"
+
+###############################################################################
+# Network interfaces
+# Verify interface names match your nodes: `ip link show`
+###############################################################################
+
+# Management / API interface (carries all OpenStack API traffic)
+network_interface: "eno1"
+api_interface: "eno1"
+
+# Storage interface (Ceph public network, iSCSI, live migration)
+storage_interface: "eno3"
+
+# Ceph cluster (OSD replication) — can be the same as storage for smaller
+# deployments; a dedicated interface is preferred for production
+cluster_interface: "eno3"
+
+# DNS interface for Designate (if enabled)
+dns_interface: "eno1"
+
+# External / provider network interface — this interface must be UP with NO IP
+# Neutron will attach it to br-ex via OVS
+neutron_external_interface: "eno2"
+
+###############################################################################
+# TLS configuration
+# Set to "yes" and provide certificates in /etc/kolla/certificates/ to enable
+###############################################################################
+
+kolla_enable_tls_internal: "no"
+kolla_enable_tls_external: "no"
+# kolla_copy_ca_into_containers: "yes"
+# kolla_certificates_dir: "/etc/kolla/certificates"
+
+###############################################################################
+# Core infrastructure services
+###############################################################################
+
+# HAProxy fronts all API endpoints; required for HA deployments
+enable_haproxy: "yes"
+
+# Keepalived manages the VIP (kolla_internal_vip_address) across controllers
+enable_keepalived: "yes"
+
+# MariaDB with Galera replication across all control nodes
+enable_mariadb: "yes"
+
+# RabbitMQ clustered message bus
+enable_rabbitmq: "yes"
+
+# Memcached for token caching
+enable_memcached: "yes"
+
+# Chrony for NTP synchronisation across all nodes
+enable_chrony: "yes"
+
+###############################################################################
+# Core OpenStack services
+###############################################################################
+
+enable_keystone: "yes"
+enable_nova: "yes"
+enable_neutron: "yes"
+enable_glance: "yes"
+enable_cinder: "yes"
+enable_heat: "yes"
+enable_barbican: "yes"
+enable_horizon: "yes"
+
+# Optional services (disabled by default — enable as needed)
+enable_designate: "no"
+enable_octavia: "no"
+enable_magnum: "no"
+enable_manila: "no"
+enable_ironic: "no"
+enable_trove: "no"
+enable_zun: "no"
+
+###############################################################################
+# Monitoring stack
+###############################################################################
+
+enable_prometheus: "yes"
+enable_grafana: "yes"
+
+# Per-service exporters — enable only what you have deployed
+enable_prometheus_node_exporter: "yes"
+enable_prometheus_mysqld_exporter: "yes"
+enable_prometheus_rabbitmq_exporter: "yes"
+enable_prometheus_haproxy_exporter: "yes"
+enable_prometheus_ceph_mgr_exporter: "yes"
+enable_prometheus_openstack_exporter: "yes"
+
+# Centralised logging (optional — requires significant storage)
+enable_central_logging: "no"
+# enable_opensearch: "no"
+# enable_opensearch_dashboards: "no"
+
+###############################################################################
+# Nova compute configuration
+###############################################################################
+
+# Virtualisation type: kvm for bare-metal compute; qemu for nested virt only
+nova_compute_virt_type: "kvm"
+
+# Console access type: novnc (HTML5) or spice
+nova_console_type: "novnc"
+
+###############################################################################
+# Neutron networking configuration
+###############################################################################
+
+# ML2 mechanism driver
+neutron_plugin_agent: "openvswitch"
+
+# Supported type drivers (must match ml2_conf.ini)
+neutron_type_drivers: "flat,vlan,vxlan"
+
+# Default tenant network type
+neutron_tenant_network_types: "vxlan"
+
+# Mechanism drivers (l2population enables ARP optimisation with OVS)
+neutron_mechanism_drivers: "openvswitch,l2population"
+
+# Extension drivers
+neutron_extension_drivers: "port_security,qos"
+
+# Enable flat/VLAN provider networks (required for external network)
+enable_neutron_provider_networks: "yes"
+
+# Quality of Service extension
+enable_neutron_qos: "yes"
+
+# HA L3 agents (active/standby failover for routers)
+enable_neutron_agent_ha: "yes"
+
+# Distributed Virtual Routing — disabled for simplicity; enable for scale-out
+# environments where East-West traffic must bypass the network nodes
+enable_neutron_dvr: "no"
+
+# Port forwarding (DNAT rules on floating IPs)
+enable_neutron_port_forwarding: "yes"
+
+###############################################################################
+# Glance image service
+###############################################################################
+
+# Use Ceph RBD as the Glance image backend (recommended for production)
+glance_backend_ceph: "yes"
+
+# Disable local file backend when using Ceph
+glance_backend_file: "no"
+
+###############################################################################
+# Cinder block storage
+###############################################################################
+
+# Use Ceph RBD as the Cinder volume backend
+cinder_backend_ceph: "yes"
+
+# LVM volume group name (used only if cinder_backend_ceph is "no")
+cinder_volume_group: "cinder-volumes"
+
+###############################################################################
+# External Ceph integration
+# This deployment assumes Ceph is managed separately (e.g., via ceph-ansible
+# or Rook). Set enable_ceph: "no" and provide the config files below.
+###############################################################################
+
+# Set to "yes" only if you are deploying Ceph via kolla-ansible itself
+enable_ceph: "no"
+
+# Ceph monitor addresses (comma-separated; used in nova.conf and cinder.conf)
+ceph_mon_host: "10.0.1.31,10.0.1.32,10.0.1.33"
+
+# The following files must exist on the deploy node for external Ceph:
+#   /etc/kolla/config/nova/ceph.conf
+#   /etc/kolla/config/nova/ceph.client.nova.keyring
+#   /etc/kolla/config/cinder/ceph.conf
+#   /etc/kolla/config/cinder/ceph.client.cinder.keyring
+#   /etc/kolla/config/glance/ceph.conf
+#   /etc/kolla/config/glance/ceph.client.glance.keyring
+
+###############################################################################
+# MariaDB / Galera configuration
+###############################################################################
+
+# InnoDB buffer pool — set to ~70% of available RAM on controllers
+mariadb_innodb_buffer_pool_size: "8192M"
+mariadb_innodb_log_file_size: "1024M"
+
+# Galera provider options — gcache size should be ~5x the largest transaction
+mariadb_wsrep_extra_provider_options: "gcache.size=512M; gcs.fc_limit=256"
+
+###############################################################################
+# RabbitMQ configuration
+###############################################################################
+
+# Erlang cookie for cluster authentication — CHANGE THIS before deploying
+# Use: openssl rand -base64 32 | tr -d '=/+\n' | head -c 32
+rabbitmq_cluster_cookie: "ERLANG_COOKIE_CHANGE_ME"
+
+rabbitmq_user: "openstack"
+
+###############################################################################
+# Horizon dashboard
+###############################################################################
+
+# Multi-domain support (allows users to select domain at login)
+horizon_keystone_multidomain_support: "yes"
+
+# Default role assigned to new users
+horizon_keystone_default_role: "member"
+
+###############################################################################
+# Logging
+###############################################################################
+
+# Set to "True" for verbose logging during initial deployment; disable in prod
+openstack_logging_debug: "False"
+
+###############################################################################
+# HAProxy timeouts
+###############################################################################
+
+haproxy_client_timeout: "1m"
+haproxy_server_timeout: "1m"
+haproxy_connect_timeout: "10s"
+
+# Maximum connections per frontend
+haproxy_max_connections: 10000
+
+###############################################################################
+# Time synchronisation
+###############################################################################
+
+# NTP pool — ensure all nodes can reach this address
+ntp_pool_address: "pool.ntp.org"

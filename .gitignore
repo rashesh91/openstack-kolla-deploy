@@ -1,0 +1,147 @@
+# =============================================================================
+# Kolla-Ansible Production Deployment — .gitignore
+# Author: rasheshpatel <rasheshkumar.patel@gmail.com>
+# =============================================================================
+
+###############################################################################
+# Kolla-Ansible sensitive files — NEVER commit these
+###############################################################################
+
+# Generated passwords file (kolla-genpwd output)
+passwords.yml
+
+# The entire /etc/kolla/ directory if accidentally symlinked or copied here
+/etc/kolla/
+
+# OpenStack RC files containing admin credentials
+admin-openrc.sh
+*-openrc.sh
+
+###############################################################################
+# TLS certificates and private keys
+###############################################################################
+
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Certificate directories (allow CA public certs to be committed)
+certs/private/
+!certs/ca/
+
+###############################################################################
+# Secrets and tokens
+###############################################################################
+
+secrets/
+vault_pass.txt
+.vault_pass
+.vault_pass.txt
+*.secret
+*.token
+*.credentials
+
+###############################################################################
+# Python artefacts
+###############################################################################
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+###############################################################################
+# Python virtual environments
+###############################################################################
+
+.env
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+###############################################################################
+# IDE / editor files
+###############################################################################
+
+# JetBrains (PyCharm, IntelliJ, etc.)
+.idea/
+*.iml
+
+# Visual Studio Code
+.vscode/
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+\#*\#
+.\#*
+
+###############################################################################
+# Operating system metadata
+###############################################################################
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+
+###############################################################################
+# Logs
+###############################################################################
+
+*.log
+logs/
+/var/log/kolla-deploy-*.log
+
+###############################################################################
+# Ansible
+###############################################################################
+
+*.retry
+.ansible/
+ansible.log
+
+###############################################################################
+# Terraform (if used alongside for infra provisioning)
+###############################################################################
+
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+*.tfvars
+!example.tfvars
+
+###############################################################################
+# Miscellaneous temporary files
+###############################################################################
+
+*.bak
+*.tmp
+*.orig
+*.patch
+.cache/
+tmp/
+temp/

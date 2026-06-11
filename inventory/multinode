@@ -1,0 +1,215 @@
+# Kolla-Ansible Multinode Inventory
+# OpenStack 2024.1 (Caracal) Production Deployment
+# Author: rasheshpatel <rasheshkumar.patel@gmail.com>
+#
+# Node layout:
+#   Deploy node    : 10.0.1.10 (local)
+#   Controllers    : 10.0.1.11 - 10.0.1.13  (HA, Keepalived VIP 10.0.1.100)
+#   Compute nodes  : 10.0.1.21 - 10.0.1.24
+#   Storage nodes  : 10.0.1.31 - 10.0.1.33  (Ceph OSD on /dev/sdb)
+
+# ---------------------------------------------------------------------------
+# Physical / Role groups
+# ---------------------------------------------------------------------------
+
+[control]
+10.0.1.11 ansible_user=ubuntu ansible_become=true
+10.0.1.12 ansible_user=ubuntu ansible_become=true
+10.0.1.13 ansible_user=ubuntu ansible_become=true
+
+[compute]
+10.0.1.21 ansible_user=ubuntu ansible_become=true
+10.0.1.22 ansible_user=ubuntu ansible_become=true
+10.0.1.23 ansible_user=ubuntu ansible_become=true
+10.0.1.24 ansible_user=ubuntu ansible_become=true
+
+[storage]
+10.0.1.31 ansible_user=ubuntu ansible_become=true
+10.0.1.32 ansible_user=ubuntu ansible_become=true
+10.0.1.33 ansible_user=ubuntu ansible_become=true
+
+[network]
+10.0.1.11
+10.0.1.12
+10.0.1.13
+
+[monitoring]
+10.0.1.11
+10.0.1.12
+10.0.1.13
+
+[deployment]
+10.0.1.10 ansible_connection=local
+
+# ---------------------------------------------------------------------------
+# Kolla-Ansible required child groups
+# ---------------------------------------------------------------------------
+
+[baremetal:children]
+control
+compute
+storage
+
+[haproxy:children]
+control
+
+[chrony:children]
+control
+compute
+storage
+
+[mariadb:children]
+control
+
+[rabbitmq:children]
+control
+
+[outward-edge:children]
+network
+
+[nova:children]
+control
+compute
+
+[neutron:children]
+control
+network
+compute
+
+[glance:children]
+control
+
+[cinder:children]
+control
+storage
+
+[heat:children]
+control
+
+[barbican:children]
+control
+
+[horizon:children]
+control
+
+[keystone:children]
+control
+
+[memcached:children]
+control
+
+[prometheus:children]
+monitoring
+
+[grafana:children]
+monitoring
+
+[hacluster:children]
+control
+
+[openvswitch:children]
+compute
+network
+
+# ---------------------------------------------------------------------------
+# Kolla-Ansible service-level child groups (fine-grained placement)
+# ---------------------------------------------------------------------------
+
+[nova-api:children]
+control
+
+[nova-conductor:children]
+control
+
+[nova-super-conductor:children]
+control
+
+[nova-novncproxy:children]
+control
+
+[nova-scheduler:children]
+control
+
+[nova-compute:children]
+compute
+
+[nova-compute-ironic:children]
+
+[nova-serialproxy:children]
+
+[neutron-server:children]
+control
+
+[neutron-dhcp-agent:children]
+network
+
+[neutron-l3-agent:children]
+network
+
+[neutron-metadata-agent:children]
+network
+
+[neutron-openvswitch-agent:children]
+compute
+network
+
+[glance-api:children]
+control
+
+[cinder-api:children]
+control
+
+[cinder-backup:children]
+storage
+
+[cinder-scheduler:children]
+control
+
+[cinder-volume:children]
+storage
+
+[heat-api:children]
+control
+
+[heat-api-cfn:children]
+control
+
+[heat-engine:children]
+control
+
+[barbican-api:children]
+control
+
+[barbican-keystone-listener:children]
+control
+
+[barbican-worker:children]
+control
+
+[keepalived:children]
+control
+
+[prometheus-node-exporter:children]
+control
+compute
+storage
+
+[prometheus-mysqld-exporter:children]
+control
+
+[prometheus-rabbitmq-exporter:children]
+control
+
+[prometheus-haproxy-exporter:children]
+control
+
+[prometheus-ceph-mgr-exporter:children]
+storage
+
+# ---------------------------------------------------------------------------
+# Group variables
+# ---------------------------------------------------------------------------
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+ansible_ssh_common_args='-o ConnectTimeout=30 -o StrictHostKeyChecking=no'
