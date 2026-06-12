@@ -1,6 +1,6 @@
 # OpenStack Private Cloud — Kolla-Ansible
 
-**Lintel Labs @ CtrlS Data Center** · OpenStack 2024.1 Caracal · 3+4+3 HA Cluster
+**OpenStack 2024.1 Caracal · 3+4+3 HA Cluster**
 
 Production-grade HA OpenStack deployment using **Kolla-Ansible** on bare metal. Built to host AI/ML workloads internally — full data sovereignty, GPU control, no cloud egress costs.
 
@@ -11,7 +11,6 @@ Production-grade HA OpenStack deployment using **Kolla-Ansible** on bare metal. 
 ## Architecture
 
 ```
- CtrlS Data Center — Lintel Labs
  ═══════════════════════════════════════════════════════════════════════
  eno1  Management / API  ·  10.0.1.0/24
  ─────────────────────────────────────────────────────────────────────
@@ -45,7 +44,7 @@ Production-grade HA OpenStack deployment using **Kolla-Ansible** on bare metal. 
  └───────────────────────────────────────────────────────┘
  ┌─────────────────── Compute ────────────────────────────┐
  │  compute01-04  (32c / 256GB each, 512 vCPU total)      │
- │  nova-compute (KVM/libvirt) · neutron-ovs-agent        │
+ │  nova-compute (KVM/libvirt) · neutron-ovn-agent         │
  └────────────────────────────────────────────────────────┘
  ┌─────────────────── Storage ────────────────────────────┐
  │  storage01-03  (8c / 32GB · 3×4TB NVMe each)           │
@@ -57,7 +56,7 @@ Production-grade HA OpenStack deployment using **Kolla-Ansible** on bare metal. 
 | Node group  | Count | IPs | Role |
 |-------------|-------|-----|------|
 | Controllers | 3 | 10.0.1.11–13 | API, DB, MQ, Ceph Mon — HA via Keepalived + HAProxy |
-| Compute     | 4 | 10.0.1.21–24 | KVM hypervisor, Nova Compute, Neutron OVS |
+| Compute     | 4 | 10.0.1.21–24 | KVM hypervisor, Nova Compute, Neutron OVN |
 | Storage     | 3 | 10.0.1.31–33 | Ceph OSD (9 OSDs total, ~12TB usable) + Cinder Volume |
 | Deploy      | 1 | 10.0.1.10 | Runs kolla-ansible — no OpenStack containers |
 
@@ -69,7 +68,7 @@ Production-grade HA OpenStack deployment using **Kolla-Ansible** on bare metal. 
 |---------|---------|
 | Keystone | Identity + tokens |
 | Nova | Compute (KVM/libvirt) |
-| Neutron | Networking (ML2/OVS, VXLAN overlay) |
+| Neutron | Networking (ML2/OVN, Geneve overlay) |
 | Glance | Image registry (stored in Ceph) |
 | Cinder | Block volumes (Ceph backend) |
 | Horizon | Web dashboard |
