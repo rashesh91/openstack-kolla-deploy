@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Lintel Labs @ CtrlS — OpenStack Topology</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f172a;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+/* ── Header ── */
+.header{background:linear-gradient(135deg,#1e1b4b 0%,#312e81 60%,#1e1b4b 100%);
+  padding:1.25rem 2rem;display:flex;justify-content:space-between;align-items:center;
+  border-bottom:2px solid #4f46e5;flex-wrap:wrap;gap:.75rem}
+.header h1{font-size:1.4rem;font-weight:800;color:#c4b5fd}
+.header h1 span{color:#818cf8}
+.header .meta{font-size:.78rem;color:#94a3b8;margin-top:.2rem}
+.vip-box{display:flex;gap:1rem;flex-wrap:wrap}
+.vip-pill{background:#1e1b4b;border:1px solid #4f46e5;border-radius:.5rem;
+  padding:.4rem .9rem;font-size:.78rem;text-align:center}
+.vip-pill .label{color:#818cf8;font-size:.65rem;text-transform:uppercase;letter-spacing:.05em}
+.vip-pill .value{color:#c4b5fd;font-weight:700;font-size:.9rem}
+
+/* ── Tabs ── */
+.tabs{display:flex;background:#1e293b;border-bottom:1px solid #334155;padding:0 2rem}
+.tab{padding:.7rem 1.3rem;cursor:pointer;font-size:.85rem;color:#94a3b8;
+  border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab.active{color:#c4b5fd;border-bottom-color:#7c3aed}
+.tab:hover:not(.active){color:#e2e8f0}
+
+/* ── Content ── */
+.content{padding:1.5rem 2rem;max-width:1400px;margin:0 auto}
+.pane{display:none}
+.pane.active{display:block}
+
+/* ── Section titles ── */
+.section-title{font-size:.75rem;font-weight:700;color:#7c3aed;text-transform:uppercase;
+  letter-spacing:.1em;margin-bottom:.75rem}
+
+/* ── Rack view ── */
+.rack-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}
+@media(max-width:900px){.rack-grid{grid-template-columns:1fr}}
+.rack{background:#1e293b;border:1px solid #334155;border-radius:.75rem;overflow:hidden}
+.rack-header{padding:.7rem 1rem;font-size:.78rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.05em;display:flex;align-items:center;gap:.5rem}
+.rack-ctrl .rack-header{background:#312e81;color:#c4b5fd}
+.rack-compute .rack-header{background:#1c3a2e;color:#86efac}
+.rack-storage .rack-header{background:#3b1f1f;color:#fca5a5}
+.rack-deploy .rack-header{background:#1e293b;color:#94a3b8;border-bottom:1px solid #334155}
+
+.node{border:1px solid #334155;border-radius:.5rem;margin:.75rem;cursor:pointer;
+  transition:border-color .2s,background .2s;background:#0f172a}
+.node:hover{border-color:#7c3aed;background:#1a1040}
+.node-head{padding:.6rem .75rem;display:flex;justify-content:space-between;align-items:center}
+.node-name{font-weight:700;font-size:.88rem}
+.node-ip{font-size:.72rem;color:#94a3b8;font-family:'Courier New',monospace}
+.node-tags{display:flex;flex-wrap:wrap;gap:.3rem;padding:.4rem .75rem .6rem}
+.tag{font-size:.67rem;padding:.15rem .4rem;border-radius:.25rem;font-weight:600}
+.tag-api{background:#1e3a8a;color:#93c5fd}
+.tag-db{background:#3b2f00;color:#fcd34d}
+.tag-mq{background:#2d1b4e;color:#c084fc}
+.tag-net{background:#1a3a2a;color:#86efac}
+.tag-kvm{background:#1c3a5c;color:#7dd3fc}
+.tag-ceph{background:#3b1f1f;color:#fca5a5}
+.tag-mon{background:#1e293b;color:#64748b}
+.tag-ha{background:#3b1f3b;color:#f0abfc}
+
+.node-detail{display:none;border-top:1px solid #334155;padding:.6rem .75rem;
+  font-size:.7rem;color:#94a3b8;line-height:1.7}
+.node.expanded .node-detail{display:block}
+.node.expanded{border-color:#7c3aed}
+
+/* ── VIP status bar ── */
+.vip-bar{background:#1e293b;border:1px solid #4f46e5;border-radius:.5rem;
+  padding:.75rem 1rem;margin-bottom:1.5rem;display:flex;gap:2rem;flex-wrap:wrap}
+.vip-item .vip-l{font-size:.7rem;color:#818cf8;text-transform:uppercase}
+.vip-item .vip-v{font-weight:700;color:#c4b5fd;font-family:'Courier New',monospace}
+
+/* ── Network diagram (SVG) ── */
+#net-svg{width:100%;overflow-x:auto}
+svg{display:block;margin:0 auto}
+
+/* ── Service flow ── */
+.swimlane-grid{display:grid;grid-template-columns:1fr;gap:1rem}
+.swim{border-radius:.75rem;overflow:hidden}
+.swim-head{padding:.6rem 1rem;font-size:.75rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em}
+.swim-ctrl .swim-head{background:#312e81;color:#c4b5fd}
+.swim-compute .swim-head{background:#1c3a2e;color:#86efac}
+.swim-storage .swim-head{background:#3b1f1f;color:#fca5a5}
+.swim-body{background:#1e293b;padding:.75rem 1rem;display:flex;flex-wrap:wrap;gap:.5rem;
+  align-items:center;border:1px solid #334155;border-top:none;border-radius:0 0 .75rem .75rem}
+.svc{background:#0f172a;border:1px solid #334155;border-radius:.4rem;
+  padding:.35rem .7rem;font-size:.72rem;text-align:center;min-width:90px}
+.svc-api{border-color:#3b82f6;color:#93c5fd}
+.svc-net{border-color:#22c55e;color:#86efac}
+.svc-db{border-color:#eab308;color:#fcd34d}
+.svc-mq{border-color:#8b5cf6;color:#c4b5fd}
+.svc-mon{border-color:#64748b;color:#94a3b8}
+.svc-ha{border-color:#ec4899;color:#f9a8d4}
+.svc-ceph{border-color:#ef4444;color:#fca5a5}
+.svc-kvm{border-color:#0ea5e9;color:#7dd3fc}
+.arrow{color:#4f46e5;font-size:1.2rem;font-weight:700}
+.ceph-box{background:#2a1010;border:2px solid #ef4444;border-radius:.75rem;
+  padding:.75rem 1.25rem;text-align:center;margin-top:1rem}
+.ceph-box .ceph-title{font-weight:700;color:#fca5a5;font-size:.85rem;margin-bottom:.4rem}
+.ceph-pools{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+.pool-tag{background:#3b1f1f;border:1px solid #ef4444;border-radius:.3rem;
+  padding:.2rem .5rem;font-size:.7rem;color:#fca5a5;font-family:'Courier New',monospace}
+
+/* ── Footer ── */
+.footer{text-align:center;padding:1rem;color:#334155;font-size:.72rem;margin-top:2rem}
+.print-btn{background:#7c3aed;color:#fff;border:none;padding:.45rem 1rem;border-radius:.4rem;
+  font-size:.78rem;cursor:pointer;float:right;margin-top:-1.5rem}
+.print-btn:hover{background:#6d28d9}
+
+/* ── Legend ── */
+.legend{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1rem}
+.leg{display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:#94a3b8}
+.leg-dot{width:10px;height:10px;border-radius:50%}
+
+@media print{
+  .tabs,.print-btn{display:none}
+  .pane{display:block!important}
+  body{background:#fff;color:#000}
+  .rack,.node,.swim-body,.rack-header,.swim-head{background:#f8f9fa!important;color:#000!important;border-color:#ccc!important}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Lintel Labs <span>@ CtrlS Data Center</span></h1>
+    <div class="meta">OpenStack 2024.1 Caracal &nbsp;·&nbsp; Kolla-Ansible &nbsp;·&nbsp; 3 Controllers + 4 Compute + 3 Storage</div>
+  </div>
+  <div class="vip-box">
+    <div class="vip-pill">
+      <div class="label">Internal VIP</div>
+      <div class="value">10.0.1.100</div>
+    </div>
+    <div class="vip-pill">
+      <div class="label">External VIP</div>
+      <div class="value">192.168.1.100</div>
+    </div>
+    <div class="vip-pill">
+      <div class="label">Horizon</div>
+      <div class="value">http://192.168.1.100</div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('rack',this)">🏗️ Infrastructure</div>
+  <div class="tab" onclick="switchTab('network',this)">🌐 Network</div>
+  <div class="tab" onclick="switchTab('services',this)">⚙️ Services</div>
+  <div class="tab" onclick="switchTab('endpoints',this)">🔗 Endpoints</div>
+</div>
+
+<!-- ══════════ TAB: INFRASTRUCTURE ══════════ -->
+<div id="pane-rack" class="pane active">
+<div class="content">
+  <button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
+
+  <div class="vip-bar">
+    <div class="vip-item"><div class="vip-l">Internal VIP · Keepalived + HAProxy</div><div class="vip-v">10.0.1.100</div></div>
+    <div class="vip-item"><div class="vip-l">External VIP · Horizon + Public APIs</div><div class="vip-v">192.168.1.100</div></div>
+    <div class="vip-item"><div class="vip-l">HA Stats</div><div class="vip-v">:1984/stats</div></div>
+    <div class="vip-item"><div class="vip-l">Grafana</div><div class="vip-v">:3000</div></div>
+    <div class="vip-item"><div class="vip-l">noVNC Console</div><div class="vip-v">:6080</div></div>
+  </div>
+
+  <p style="font-size:.75rem;color:#64748b;margin-bottom:1rem">Click any node to expand its container list.</p>
+
+  <div class="rack-grid">
+
+    <!-- Controllers -->
+    <div class="rack rack-ctrl">
+      <div class="rack-header">🟣 Controllers — HA Cluster × 3</div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">ctrl01</span>
+          <span class="node-ip">10.0.1.11 · 16c/64GB · ⚡ VIP MASTER</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-ha">HAProxy</span><span class="tag tag-ha">Keepalived</span>
+          <span class="tag tag-db">MariaDB</span><span class="tag tag-mq">RabbitMQ</span>
+          <span class="tag tag-db">Memcached</span><span class="tag tag-api">Keystone</span>
+          <span class="tag tag-api">Nova API</span><span class="tag tag-net">Neutron</span>
+          <span class="tag tag-api">Glance</span><span class="tag tag-api">Cinder</span>
+          <span class="tag tag-api">Heat</span><span class="tag tag-api">Barbican</span>
+          <span class="tag tag-api">Horizon</span><span class="tag tag-mon">Prometheus</span>
+          <span class="tag tag-mon">Grafana</span>
+        </div>
+        <div class="node-detail">
+          <strong>Infrastructure:</strong> haproxy, keepalived, mariadb (Galera), rabbitmq, memcached, chrony<br>
+          <strong>Identity/Compute:</strong> keystone, nova_api, nova_conductor, nova_super_conductor, nova_scheduler, nova_novncproxy<br>
+          <strong>Networking:</strong> neutron_server, neutron_dhcp_agent, neutron_l3_agent, neutron_metadata_agent, openvswitch_db, openvswitch_vswitchd<br>
+          <strong>Storage/Orch:</strong> glance_api, cinder_api, cinder_scheduler, heat_api, heat_api_cfn, heat_engine, barbican_api, barbican_keystone_listener, barbican_worker, horizon<br>
+          <strong>Monitoring:</strong> prometheus, grafana, prometheus_node_exporter, prometheus_mysqld_exporter, prometheus_rabbitmq_exporter, prometheus_haproxy_exporter, prometheus_openstack_exporter<br>
+          <strong>NICs:</strong> eno1=10.0.1.11 (mgmt/VIP) · eno2=br-ex (external) · eno3=10.0.2.11 (storage/VTEP) · eno4=10.0.3.11 (Ceph repl)<br>
+          <strong>~35 containers total</strong>
+        </div>
+      </div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">ctrl02</span>
+          <span class="node-ip">10.0.1.12 · 16c/64GB · BACKUP</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-ha">HAProxy</span><span class="tag tag-ha">Keepalived</span>
+          <span class="tag tag-db">MariaDB</span><span class="tag tag-mq">RabbitMQ</span>
+          <span class="tag tag-api">All APIs</span><span class="tag tag-mon">Prometheus</span>
+        </div>
+        <div class="node-detail">
+          Same container set as ctrl01. Identical role — stands by to take VIP on ctrl01 failure.<br>
+          <strong>NICs:</strong> eno1=10.0.1.12 · eno2=br-ex · eno3=10.0.2.12 · eno4=10.0.3.12
+        </div>
+      </div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">ctrl03</span>
+          <span class="node-ip">10.0.1.13 · 16c/64GB · BACKUP</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-ha">HAProxy</span><span class="tag tag-ha">Keepalived</span>
+          <span class="tag tag-db">MariaDB</span><span class="tag tag-mq">RabbitMQ</span>
+          <span class="tag tag-api">All APIs</span><span class="tag tag-mon">Prometheus</span>
+        </div>
+        <div class="node-detail">
+          Same container set as ctrl01. Provides Galera quorum (3rd vote prevents split-brain).<br>
+          <strong>NICs:</strong> eno1=10.0.1.13 · eno2=br-ex · eno3=10.0.2.13 · eno4=10.0.3.13
+        </div>
+      </div>
+
+      <!-- Deploy node at bottom of ctrl rack -->
+      <div class="rack rack-deploy" style="margin:.75rem;border-radius:.4rem">
+        <div class="rack-header">🔧 deploy01 — 10.0.1.10</div>
+        <div class="node-detail" style="display:block;border:none;padding:.5rem .75rem;background:#0f172a">
+          kolla-ansible · Ansible · /etc/kolla/globals.yml<br>
+          No OpenStack containers — deploy time only
+        </div>
+      </div>
+    </div>
+
+    <!-- Compute -->
+    <div class="rack rack-compute">
+      <div class="rack-header">🟢 Compute Nodes — KVM × 4</div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">compute01</span>
+          <span class="node-ip">10.0.1.21 · 32c/256GB</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-kvm">nova-compute</span>
+          <span class="tag tag-kvm">libvirt/KVM</span>
+          <span class="tag tag-net">OVS Agent</span>
+          <span class="tag tag-mon">Node Exporter</span>
+        </div>
+        <div class="node-detail">
+          <strong>Containers:</strong> nova_compute, nova_libvirt, neutron_openvswitch_agent, openvswitch_db, openvswitch_vswitchd, prometheus_node_exporter, chrony<br>
+          <strong>CPU allocation:</strong> 32 cores × 4.0 overcommit = 128 vCPU<br>
+          <strong>RAM:</strong> 256 GB − 2 GB reserved = 254 GB available<br>
+          <strong>Ephemeral disks:</strong> Stored in Ceph RBD pool "vms" (NOT local storage)<br>
+          <strong>NICs:</strong> eno1=10.0.1.21 (mgmt) · eno2=br-ex (external) · eno3=10.0.2.21 (VXLAN VTEP) · eno4=unused<br>
+          <strong>~7 containers total</strong>
+        </div>
+      </div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">compute02</span>
+          <span class="node-ip">10.0.1.22 · 32c/256GB</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-kvm">nova-compute</span>
+          <span class="tag tag-kvm">libvirt/KVM</span>
+          <span class="tag tag-net">OVS Agent</span>
+        </div>
+        <div class="node-detail">Identical to compute01. NICs: eno1=10.0.1.22 · eno3=10.0.2.22</div>
+      </div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">compute03</span>
+          <span class="node-ip">10.0.1.23 · 32c/256GB</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-kvm">nova-compute</span>
+          <span class="tag tag-kvm">libvirt/KVM</span>
+          <span class="tag tag-net">OVS Agent</span>
+        </div>
+        <div class="node-detail">Identical to compute01. NICs: eno1=10.0.1.23 · eno3=10.0.2.23</div>
+      </div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">compute04</span>
+          <span class="node-ip">10.0.1.24 · 32c/256GB</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-kvm">nova-compute</span>
+          <span class="tag tag-kvm">libvirt/KVM</span>
+          <span class="tag tag-net">OVS Agent</span>
+        </div>
+        <div class="node-detail">Identical to compute01. NICs: eno1=10.0.1.24 · eno3=10.0.2.24</div>
+      </div>
+
+      <div style="padding:.6rem .75rem;font-size:.7rem;color:#64748b;border-top:1px solid #1e293b">
+        Total cluster capacity: <strong style="color:#86efac">512 vCPU · ~1 TB RAM · Disk in Ceph</strong>
+      </div>
+    </div>
+
+    <!-- Storage -->
+    <div class="rack rack-storage">
+      <div class="rack-header">🔴 Storage Nodes — Ceph OSD × 3</div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">storage01</span>
+          <span class="node-ip">10.0.1.31 · 8c/32GB · Ceph MON IP</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-ceph">Ceph OSD ×3</span>
+          <span class="tag tag-ceph">cinder-volume</span>
+          <span class="tag tag-ceph">cinder-backup</span>
+          <span class="tag tag-mon">Ceph MGR Exporter</span>
+        </div>
+        <div class="node-detail">
+          <strong>Containers (Kolla-managed):</strong> cinder_volume, cinder_backup, prometheus_node_exporter, prometheus_ceph_mgr_exporter, chrony<br>
+          <strong>Ceph (NOT Kolla-managed — external):</strong> 3× OSD on /dev/sdb, /dev/sdc, /dev/sdd<br>
+          <strong>Ceph MON IP:</strong> 10.0.1.31 (referenced in globals.yml ceph_mon_host)<br>
+          <strong>Note:</strong> Ceph MON/MGR daemons run on controllers, not here<br>
+          <strong>NICs:</strong> eno1=10.0.1.31 (mgmt) · eno3=10.0.2.31 (Ceph public) · eno4=10.0.3.31 (Ceph replication)<br>
+          <strong>~5 containers + Ceph OSD processes</strong>
+        </div>
+      </div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">storage02</span>
+          <span class="node-ip">10.0.1.32 · 8c/32GB</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-ceph">Ceph OSD ×3</span>
+          <span class="tag tag-ceph">cinder-volume</span>
+          <span class="tag tag-mon">Ceph MGR Exporter</span>
+        </div>
+        <div class="node-detail">Identical to storage01. NICs: eno1=10.0.1.32 · eno3=10.0.2.32 · eno4=10.0.3.32</div>
+      </div>
+
+      <div class="node" onclick="toggle(this)">
+        <div class="node-head">
+          <span class="node-name">storage03</span>
+          <span class="node-ip">10.0.1.33 · 8c/32GB</span>
+        </div>
+        <div class="node-tags">
+          <span class="tag tag-ceph">Ceph OSD ×3</span>
+          <span class="tag tag-ceph">cinder-volume</span>
+          <span class="tag tag-mon">Ceph MGR Exporter</span>
+        </div>
+        <div class="node-detail">Identical to storage01. NICs: eno1=10.0.1.33 · eno3=10.0.2.33 · eno4=10.0.3.33</div>
+      </div>
+
+      <div style="padding:.6rem .75rem;font-size:.7rem;color:#64748b;border-top:1px solid #1e293b">
+        Ceph capacity: <strong style="color:#fca5a5">9 OSDs × 4TB = 36TB raw → ~12TB usable (3× replicas)</strong><br>
+        Pools: <code style="color:#f87171">images</code> · <code style="color:#f87171">volumes</code> · <code style="color:#f87171">vms</code> · <code style="color:#f87171">backups</code>
+      </div>
+    </div>
+
+  </div><!-- rack-grid -->
+</div>
+</div>
+
+<!-- ══════════ TAB: NETWORK ══════════ -->
+<div id="pane-network" class="pane">
+<div class="content">
+
+  <div class="section-title">4 Physical Networks</div>
+
+  <svg id="net-svg" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg" style="max-width:900px">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#475569"/>
+      </marker>
+      <marker id="arr-vxlan" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+        <polygon points="0 0, 8 3, 0 6" fill="#f97316"/>
+      </marker>
+    </defs>
+
+    <!-- Network lane backgrounds -->
+    <rect x="10" y="10" width="880" height="120" rx="8" fill="#1e3a8a" opacity=".25"/>
+    <rect x="10" y="150" width="880" height="120" rx="8" fill="#92400e" opacity=".25"/>
+    <rect x="10" y="290" width="880" height="120" rx="8" fill="#14532d" opacity=".25"/>
+    <rect x="10" y="430" width="880" height="110" rx="8" fill="#3b0764" opacity=".25"/>
+
+    <!-- Network lane labels -->
+    <text x="22" y="32" font-size="11" fill="#93c5fd" font-weight="700">eno1 — Management / API</text>
+    <text x="22" y="48" font-size="9" fill="#60a5fa">10.0.1.0/24 · SSH · OpenStack APIs · Keepalived VIP · Galera · RabbitMQ</text>
+
+    <text x="22" y="172" font-size="11" fill="#fbbf24" font-weight="700">eno2 — External / Provider</text>
+    <text x="22" y="188" font-size="9" fill="#fcd34d">untagged, no IP · OVS br-ex · physnet1 · Floating IPs 192.168.100.0/24</text>
+
+    <text x="22" y="312" font-size="11" fill="#86efac" font-weight="700">eno3 — Storage / VXLAN VTEP</text>
+    <text x="22" y="328" font-size="9" fill="#4ade80">10.0.2.0/24 · Ceph public network · VXLAN endpoints (VTEPs) · Live migration</text>
+
+    <text x="22" y="452" font-size="11" fill="#d8b4fe" font-weight="700">eno4 — Ceph Cluster Replication</text>
+    <text x="22" y="468" font-size="9" fill="#a78bfa">10.0.3.0/24 · cabled, not yet active (cluster_interface=eno3 in globals.yml)</text>
+
+    <!-- Horizontal bus lines -->
+    <line x1="150" y1="90" x2="870" y2="90" stroke="#3b82f6" stroke-width="3"/>
+    <line x1="320" y1="230" x2="870" y2="230" stroke="#f59e0b" stroke-width="3"/>
+    <line x1="150" y1="370" x2="870" y2="370" stroke="#22c55e" stroke-width="3"/>
+    <line x1="560" y1="510" x2="870" y2="510" stroke="#8b5cf6" stroke-width="3"/>
+
+    <!-- Node circles and connections — eno1 (all nodes) -->
+    <!-- deploy01 -->
+    <circle cx="160" cy="90" r="18" fill="#1e3a8a" stroke="#3b82f6" stroke-width="2"/>
+    <text x="160" y="86" text-anchor="middle" font-size="7.5" fill="#93c5fd" font-weight="600">deploy01</text>
+    <text x="160" y="96" text-anchor="middle" font-size="6.5" fill="#60a5fa">.10</text>
+
+    <!-- ctrl01,02,03 - eno1 -->
+    <circle cx="240" cy="90" r="20" fill="#312e81" stroke="#6366f1" stroke-width="2.5"/>
+    <text x="240" y="86" text-anchor="middle" font-size="8" fill="#c4b5fd" font-weight="700">ctrl01</text>
+    <text x="240" y="97" text-anchor="middle" font-size="7" fill="#818cf8">.11 ⚡</text>
+
+    <circle cx="310" cy="90" r="20" fill="#312e81" stroke="#6366f1" stroke-width="2.5"/>
+    <text x="310" y="86" text-anchor="middle" font-size="8" fill="#c4b5fd" font-weight="700">ctrl02</text>
+    <text x="310" y="97" text-anchor="middle" font-size="7" fill="#818cf8">.12</text>
+
+    <circle cx="380" cy="90" r="20" fill="#312e81" stroke="#6366f1" stroke-width="2.5"/>
+    <text x="380" y="86" text-anchor="middle" font-size="8" fill="#c4b5fd" font-weight="700">ctrl03</text>
+    <text x="380" y="97" text-anchor="middle" font-size="7" fill="#818cf8">.13</text>
+
+    <!-- compute01-04 eno1 -->
+    <circle cx="480" cy="90" r="18" fill="#1c3a2e" stroke="#22c55e" stroke-width="2"/>
+    <text x="480" y="86" text-anchor="middle" font-size="7.5" fill="#86efac" font-weight="600">comp01</text>
+    <text x="480" y="97" text-anchor="middle" font-size="6.5" fill="#4ade80">.21</text>
+
+    <circle cx="540" cy="90" r="18" fill="#1c3a2e" stroke="#22c55e" stroke-width="2"/>
+    <text x="540" y="86" text-anchor="middle" font-size="7.5" fill="#86efac" font-weight="600">comp02</text>
+    <text x="540" y="97" text-anchor="middle" font-size="6.5" fill="#4ade80">.22</text>
+
+    <circle cx="600" cy="90" r="18" fill="#1c3a2e" stroke="#22c55e" stroke-width="2"/>
+    <text x="600" y="86" text-anchor="middle" font-size="7.5" fill="#86efac" font-weight="600">comp03</text>
+    <text x="600" y="97" text-anchor="middle" font-size="6.5" fill="#4ade80">.23</text>
+
+    <circle cx="660" cy="90" r="18" fill="#1c3a2e" stroke="#22c55e" stroke-width="2"/>
+    <text x="660" y="86" text-anchor="middle" font-size="7.5" fill="#86efac" font-weight="600">comp04</text>
+    <text x="660" y="97" text-anchor="middle" font-size="6.5" fill="#4ade80">.24</text>
+
+    <!-- storage01-03 eno1 -->
+    <circle cx="760" cy="90" r="18" fill="#3b1f1f" stroke="#ef4444" stroke-width="2"/>
+    <text x="760" y="86" text-anchor="middle" font-size="7.5" fill="#fca5a5" font-weight="600">stor01</text>
+    <text x="760" y="97" text-anchor="middle" font-size="6.5" fill="#f87171">.31</text>
+
+    <circle cx="820" cy="90" r="18" fill="#3b1f1f" stroke="#ef4444" stroke-width="2"/>
+    <text x="820" y="86" text-anchor="middle" font-size="7.5" fill="#fca5a5" font-weight="600">stor02</text>
+    <text x="820" y="97" text-anchor="middle" font-size="6.5" fill="#f87171">.32</text>
+
+    <circle cx="875" cy="90" r="18" fill="#3b1f1f" stroke="#ef4444" stroke-width="2"/>
+    <text x="875" y="86" text-anchor="middle" font-size="7.5" fill="#fca5a5" font-weight="600">stor03</text>
+    <text x="875" y="97" text-anchor="middle" font-size="6.5" fill="#f87171">.33</text>
+
+    <!-- VIP annotation -->
+    <rect x="215" y="58" width="205" height="20" rx="4" fill="#4f46e5" opacity=".4"/>
+    <text x="318" y="71" text-anchor="middle" font-size="8" fill="#c4b5fd">⚡ VIP 10.0.1.100 / 192.168.1.100 (Keepalived)</text>
+
+    <!-- eno2 nodes: ctrl01-03 + compute01-04 -->
+    <circle cx="330" cy="230" r="20" fill="#78350f" stroke="#f59e0b" stroke-width="2.5"/>
+    <text x="330" y="226" text-anchor="middle" font-size="8" fill="#fcd34d" font-weight="700">ctrl01-03</text>
+    <text x="330" y="237" text-anchor="middle" font-size="7" fill="#fbbf24">br-ex</text>
+
+    <circle cx="480" cy="230" r="20" fill="#78350f" stroke="#f59e0b" stroke-width="2"/>
+    <text x="480" y="226" text-anchor="middle" font-size="8" fill="#fcd34d" font-weight="700">comp01-04</text>
+    <text x="480" y="237" text-anchor="middle" font-size="7" fill="#fbbf24">br-ex</text>
+
+    <!-- Floating IP box -->
+    <rect x="700" y="210" width="160" height="40" rx="6" fill="#78350f" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="780" y="228" text-anchor="middle" font-size="8.5" fill="#fcd34d" font-weight="700">🌐 Floating IPs</text>
+    <text x="780" y="242" text-anchor="middle" font-size="7.5" fill="#fbbf24">192.168.100.100–.200</text>
+    <line x1="700" y1="230" x2="500" y2="230" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+    <!-- eno3: ctrl01-03 + compute01-04 + storage01-03 -->
+    <circle cx="240" cy="370" r="20" fill="#14532d" stroke="#22c55e" stroke-width="2.5"/>
+    <text x="240" y="366" text-anchor="middle" font-size="8" fill="#86efac" font-weight="700">ctrl01-03</text>
+    <text x="240" y="377" text-anchor="middle" font-size="7" fill="#4ade80">VTEP .11-13</text>
+
+    <circle cx="440" cy="370" r="20" fill="#14532d" stroke="#22c55e" stroke-width="2.5"/>
+    <text x="440" y="366" text-anchor="middle" font-size="8" fill="#86efac" font-weight="700">comp01-04</text>
+    <text x="440" y="377" text-anchor="middle" font-size="7" fill="#4ade80">VTEP .21-24</text>
+
+    <circle cx="700" cy="370" r="20" fill="#14532d" stroke="#22c55e" stroke-width="2.5"/>
+    <text x="700" y="366" text-anchor="middle" font-size="8" fill="#86efac" font-weight="700">stor01-03</text>
+    <text x="700" y="377" text-anchor="middle" font-size="7" fill="#4ade80">Ceph .31-33</text>
+
+    <!-- VXLAN arch annotation -->
+    <path d="M 260 355 Q 450 295 620 355" stroke="#f97316" stroke-width="2" fill="none" stroke-dasharray="5,3" marker-end="url(#arr-vxlan)"/>
+    <text x="450" y="322" text-anchor="middle" font-size="8" fill="#fb923c">VXLAN overlay VNI 1-65535 · UDP 4789</text>
+
+    <!-- eno4: only storage nodes -->
+    <circle cx="640" cy="510" r="18" fill="#3b0764" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="640" y="506" text-anchor="middle" font-size="7.5" fill="#d8b4fe" font-weight="600">stor01</text>
+    <text x="640" y="517" text-anchor="middle" font-size="6.5" fill="#a78bfa">.31</text>
+
+    <circle cx="750" cy="510" r="18" fill="#3b0764" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="750" y="506" text-anchor="middle" font-size="7.5" fill="#d8b4fe" font-weight="600">stor02</text>
+    <text x="750" y="517" text-anchor="middle" font-size="6.5" fill="#a78bfa">.32</text>
+
+    <circle cx="860" cy="510" r="18" fill="#3b0764" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="860" y="506" text-anchor="middle" font-size="7.5" fill="#d8b4fe" font-weight="600">stor03</text>
+    <text x="860" y="517" text-anchor="middle" font-size="6.5" fill="#a78bfa">.33</text>
+
+    <!-- Note for eno4 -->
+    <text x="160" y="510" font-size="9" fill="#7c3aed">⚠ cluster_interface=eno3 currently</text>
+    <text x="160" y="524" font-size="8" fill="#6d28d9">Change to eno4 for isolated replication</text>
+  </svg>
+
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:#3b82f6"></div> eno1 Management/API</div>
+    <div class="leg"><div class="leg-dot" style="background:#f59e0b"></div> eno2 External/Provider</div>
+    <div class="leg"><div class="leg-dot" style="background:#22c55e"></div> eno3 Storage/VXLAN</div>
+    <div class="leg"><div class="leg-dot" style="background:#8b5cf6"></div> eno4 Ceph Replication (unused)</div>
+    <div class="leg"><div class="leg-dot" style="background:#f97316"></div> VXLAN overlay (tenant networks)</div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════ TAB: SERVICES ══════════ -->
+<div id="pane-services" class="pane">
+<div class="content">
+
+  <div class="section-title">Service Flow — Controller → Compute → Storage → Ceph</div>
+
+  <div class="swimlane-grid">
+
+    <div class="swim swim-ctrl">
+      <div class="swim-head">🟣 Controllers (ctrl01 · ctrl02 · ctrl03) — All services run on all three</div>
+      <div class="swim-body">
+        <span class="svc svc-ha">⚖️ HAProxy<br>VIP .100</span>
+        <span class="arrow">→</span>
+        <span class="svc svc-ha">⚡ Keepalived<br>VRRP</span>
+        <span class="svc svc-db">🗃️ MariaDB<br>Galera ×3</span>
+        <span class="svc svc-mq">📨 RabbitMQ<br>cluster ×3</span>
+        <span class="svc svc-db">⚡ Memcached<br>×3 :11211</span>
+        <span class="svc svc-api">🔑 Keystone<br>:5000</span>
+        <span class="svc svc-api">🖥️ Nova API<br>:8774</span>
+        <span class="svc svc-api">🖥️ noVNC<br>:6080</span>
+        <span class="svc svc-net">🌐 Neutron<br>:9696</span>
+        <span class="svc svc-net">🌐 L3/DHCP<br>Agents</span>
+        <span class="svc svc-api">📦 Glance<br>:9292</span>
+        <span class="svc svc-api">💾 Cinder<br>:8776</span>
+        <span class="svc svc-api">🌡️ Heat<br>:8004</span>
+        <span class="svc svc-api">🔒 Barbican<br>:9311</span>
+        <span class="svc svc-api">🖥️ Horizon<br>:80</span>
+        <span class="svc svc-mon">📊 Prometheus<br>:9090</span>
+        <span class="svc svc-mon">📊 Grafana<br>:3000</span>
+      </div>
+    </div>
+
+    <div style="text-align:center;color:#4f46e5;font-size:1.5rem;padding:.25rem">↕ Nova API → nova-compute · Neutron Server → OVS Agent · Cinder API → cinder-volume</div>
+
+    <div class="swim swim-compute">
+      <div class="swim-head">🟢 Compute (compute01–04) — Nova hypervisor, OVS forwarding</div>
+      <div class="swim-body">
+        <span class="svc svc-kvm">🖥️ nova-compute<br>KVM/libvirt</span>
+        <span class="svc svc-kvm">⚙️ libvirtd<br>VM daemon</span>
+        <span class="svc svc-net">🌐 neutron-ovs<br>agent</span>
+        <span class="svc svc-net">🔀 OVS<br>br-int/tun/ex</span>
+        <span class="svc svc-mon">📊 Node<br>Exporter</span>
+        <div style="width:100%;font-size:.7rem;color:#64748b;margin-top:.5rem">
+          CPU: 32 cores × 4.0 = 128 vCPU per node · RAM: 254 GB usable per node · Disk: Ceph RBD (no local ephemeral)
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;color:#4f46e5;font-size:1.5rem;padding:.25rem">↕ All three write/read Ceph via eno3 (10.0.2.0/24)</div>
+
+    <div class="swim swim-storage">
+      <div class="swim-head">🔴 Storage (storage01–03) — Cinder backend, Ceph OSDs</div>
+      <div class="swim-body">
+        <span class="svc svc-ceph">💾 cinder-volume<br>Ceph RBD</span>
+        <span class="svc svc-ceph">💾 cinder-backup<br>Ceph backups</span>
+        <span class="svc svc-ceph">🗄️ Ceph OSD ×3<br>(external)</span>
+        <span class="svc svc-mon">📊 Ceph MGR<br>Exporter</span>
+        <div style="width:100%;font-size:.7rem;color:#64748b;margin-top:.5rem">
+          9 OSDs total · 36TB raw · ~12TB usable (3× replication)
+        </div>
+      </div>
+    </div>
+
+  </div><!-- swimlane-grid -->
+
+  <div class="ceph-box">
+    <div class="ceph-title">🗄️ External Ceph Cluster — MON IPs: 10.0.1.31 · 10.0.1.32 · 10.0.1.33</div>
+    <div class="ceph-pools">
+      <span class="pool-tag">images → Glance</span>
+      <span class="pool-tag">volumes → Cinder</span>
+      <span class="pool-tag">vms → Nova ephemeral</span>
+      <span class="pool-tag">backups → Cinder backup</span>
+    </div>
+    <div style="font-size:.7rem;color:#f87171;margin-top:.5rem">
+      ⚠ enable_ceph: "no" — Ceph is not managed by Kolla-Ansible. Keyrings must be placed manually before deploy.
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- ══════════ TAB: ENDPOINTS ══════════ -->
+<div id="pane-endpoints" class="pane">
+<div class="content">
+
+  <div class="section-title">All Access Endpoints</div>
+
+  <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+    <thead>
+      <tr style="border-bottom:2px solid #334155">
+        <th style="padding:.6rem .75rem;text-align:left;color:#7c3aed">Service</th>
+        <th style="padding:.6rem .75rem;text-align:left;color:#7c3aed">URL</th>
+        <th style="padding:.6rem .75rem;text-align:left;color:#7c3aed">Network</th>
+        <th style="padding:.6rem .75rem;text-align:left;color:#7c3aed">Notes</th>
+      </tr>
+    </thead>
+    <tbody id="ep-table"></tbody>
+  </table>
+
+  <div style="margin-top:1.5rem;background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1rem">
+    <div class="section-title">CLI Quick Start</div>
+    <pre style="font-size:.78rem;color:#86efac;line-height:1.8">source /etc/kolla/admin-openrc.sh
+openstack service list
+openstack hypervisor list --long
+openstack network agent list</pre>
+  </div>
+
+</div>
+</div>
+
+<div class="footer">
+  Lintel Labs @ CtrlS Data Center · OpenStack 2024.1 Caracal · Kolla-Ansible · rasheshpatel
+</div>
+
+<script>
+function toggle(node){node.classList.toggle('expanded')}
+function switchTab(name,tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'))
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'))
+  tab.classList.add('active')
+  document.getElementById('pane-'+name).classList.add('active')
+  if(name==='endpoints') buildEndpoints()
+}
+const ENDPOINTS=[
+  {svc:'Horizon Dashboard',url:'http://192.168.1.100',net:'External',note:'Main web UI — admin credentials from admin-openrc.sh'},
+  {svc:'Keystone Identity',url:'http://10.0.1.100:5000/v3',net:'Internal',note:'Auth tokens, service catalog'},
+  {svc:'Nova Compute API',url:'http://10.0.1.100:8774/v2.1',net:'Internal',note:'VM lifecycle, flavors, hypervisors'},
+  {svc:'Neutron Network API',url:'http://10.0.1.100:9696',net:'Internal',note:'Networks, subnets, routers, floating IPs'},
+  {svc:'Glance Image API',url:'http://10.0.1.100:9292',net:'Internal',note:'VM images (stored in Ceph pool: images)'},
+  {svc:'Cinder Block Storage',url:'http://10.0.1.100:8776/v3',net:'Internal',note:'Block volumes (Ceph pool: volumes)'},
+  {svc:'Heat Orchestration',url:'http://10.0.1.100:8004/v1',net:'Internal',note:'Stack templates (YAML)'},
+  {svc:'Barbican Secrets',url:'http://10.0.1.100:9311',net:'Internal',note:'TLS certs, encryption keys, passwords'},
+  {svc:'noVNC Console',url:'http://10.0.1.100:6080/vnc_lite.html',net:'Internal',note:'Browser-based VM console access'},
+  {svc:'Grafana Dashboards',url:'http://10.0.1.100:3000',net:'Internal',note:'OpenStack + Ceph + system metrics'},
+  {svc:'Prometheus Metrics',url:'http://10.0.1.100:9090',net:'Internal',note:'Raw metrics, alerts, service health'},
+  {svc:'HAProxy Stats',url:'http://10.0.1.100:1984/stats',net:'Internal',note:'Backend health, connection counts per service'},
+];
+function buildEndpoints(){
+  const tb=document.getElementById('ep-table')
+  if(tb.children.length>0)return
+  ENDPOINTS.forEach(e=>{
+    const tr=document.createElement('tr')
+    tr.style.borderBottom='1px solid #1e293b'
+    tr.innerHTML=`<td style="padding:.5rem .75rem;font-weight:600;color:#c4b5fd">${e.svc}</td>
+      <td style="padding:.5rem .75rem"><a href="${e.url}" target="_blank"
+        style="color:#60a5fa;font-family:'Courier New',monospace;font-size:.78rem">${e.url}</a></td>
+      <td style="padding:.5rem .75rem"><span style="font-size:.7rem;padding:.15rem .45rem;border-radius:.3rem;
+        background:${e.net==='External'?'#78350f':'#1e3a5f'};color:${e.net==='External'?'#fcd34d':'#93c5fd'}">${e.net}</span></td>
+      <td style="padding:.5rem .75rem;color:#94a3b8;font-size:.78rem">${e.note}</td>`
+    tb.appendChild(tr)
+  })
+}
+</script>
+</body>
+</html>

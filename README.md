@@ -1,5 +1,7 @@
 # OpenStack Private Cloud — Kolla-Ansible
 
+**Lintel Labs @ CtrlS Data Center** · OpenStack 2024.1 Caracal · 3+4+3 HA Cluster
+
 Production-grade HA OpenStack deployment using **Kolla-Ansible** on bare metal. Built to host AI/ML workloads internally — full data sovereignty, GPU control, no cloud egress costs.
 
 **OpenStack release:** 2024.1 (Caracal)
@@ -9,24 +11,55 @@ Production-grade HA OpenStack deployment using **Kolla-Ansible** on bare metal. 
 ## Architecture
 
 ```
-                    VIP: 10.0.1.100 (Keepalived + HAProxy)
-                    ┌──────────┬──────────┬──────────┐
-                  ctrl01     ctrl02     ctrl03
-               10.0.1.11  10.0.1.12  10.0.1.13
-       Keystone · Nova · Neutron · Glance · Cinder · Horizon
-       MariaDB (Galera) · RabbitMQ · Memcached · Ceph Mon/MGR
+ CtrlS Data Center — Lintel Labs
+ ═══════════════════════════════════════════════════════════════════════
+ eno1  Management / API  ·  10.0.1.0/24
+ ─────────────────────────────────────────────────────────────────────
+   deploy01(.10)
+   ctrl01(.11) ─── ctrl02(.12) ─── ctrl03(.13)
+   compute01(.21) ─ compute02(.22) ─ compute03(.23) ─ compute04(.24)
+   storage01(.31) ─ storage02(.32) ─ storage03(.33)
+   ⚡ Internal VIP: 10.0.1.100  │  🌐 External VIP: 192.168.1.100
+ ═══════════════════════════════════════════════════════════════════════
+ eno2  External / Provider  ·  untagged  ·  br-ex
+ ─────────────────────────────────────────────────────────────────────
+   ctrl01-03 + compute01-04  →  physnet1  →  Floating IPs 192.168.100.x
+ ═══════════════════════════════════════════════════════════════════════
+ eno3  Storage + VXLAN VTEP  ·  10.0.2.0/24
+ ─────────────────────────────────────────────────────────────────────
+   ctrl01(.11) ─── ctrl02(.12) ─── ctrl03(.13)   [VTEP + Ceph clients]
+   compute01(.21) ─ compute02(.22) ─ compute03(.23) ─ compute04(.24) [VTEP]
+   storage01(.31) ─ storage02(.32) ─ storage03(.33)  [Ceph OSD public]
+   ╌╌╌╌╌ VXLAN overlay VNI 1-65535 UDP/4789 ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ ═══════════════════════════════════════════════════════════════════════
+ eno4  Ceph Replication  ·  10.0.3.0/24  (cabled, cluster_interface=eno3)
+ ─────────────────────────────────────────────────────────────────────
+   storage01(.31) ─ storage02(.32) ─ storage03(.33)
+ ═══════════════════════════════════════════════════════════════════════
 
-       compute01-04 (10.0.1.21-24)    storage01-03 (10.0.1.31-33)
-       Nova Compute (KVM)              Ceph OSD (3x disks each)
-       Neutron OVS Agent               Cinder Volume Backend
+ ┌─────────────────── Controllers ───────────────────────┐
+ │  ctrl01/02/03  (16c / 64GB each)                      │
+ │  HAProxy+Keepalived · MariaDB Galera · RabbitMQ ×3    │
+ │  Keystone · Nova · Neutron · Glance · Cinder · Heat   │
+ │  Barbican · Horizon · Prometheus · Grafana            │
+ └───────────────────────────────────────────────────────┘
+ ┌─────────────────── Compute ────────────────────────────┐
+ │  compute01-04  (32c / 256GB each, 512 vCPU total)      │
+ │  nova-compute (KVM/libvirt) · neutron-ovs-agent        │
+ └────────────────────────────────────────────────────────┘
+ ┌─────────────────── Storage ────────────────────────────┐
+ │  storage01-03  (8c / 32GB · 3×4TB NVMe each)           │
+ │  Ceph OSD (9 total, 36TB raw, ~12TB usable)            │
+ │  cinder-volume (pools: images · volumes · vms)         │
+ └────────────────────────────────────────────────────────┘
 ```
 
-| Node group  | Count | Role |
-|-------------|-------|------|
-| Controllers | 3 | API, DB, MQ, Ceph Mon — HA via Keepalived + HAProxy |
-| Compute     | 4 | KVM hypervisor, Nova Compute, Neutron OVS |
-| Storage     | 3 | Ceph OSD (3x disks = 9 OSDs total) |
-| Deploy      | 1 | Runs kolla-ansible |
+| Node group  | Count | IPs | Role |
+|-------------|-------|-----|------|
+| Controllers | 3 | 10.0.1.11–13 | API, DB, MQ, Ceph Mon — HA via Keepalived + HAProxy |
+| Compute     | 4 | 10.0.1.21–24 | KVM hypervisor, Nova Compute, Neutron OVS |
+| Storage     | 3 | 10.0.1.31–33 | Ceph OSD (9 OSDs total, ~12TB usable) + Cinder Volume |
+| Deploy      | 1 | 10.0.1.10 | Runs kolla-ansible — no OpenStack containers |
 
 ---
 
@@ -113,3 +146,24 @@ kolla-ansible -i inventory/multinode upgrade
 | Ceph `HEALTH_WARN clock skew` | `chronyc makestep` on all nodes |
 | MariaDB Galera split-brain | `docker exec mariadb galera_recovery` |
 | Prechecks fail on disk space | `/var/lib/docker` needs 200 GB+ free |
+
+---
+
+## Diagrams & Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Architecture Overview](docs/architecture-overview.md) | Node roster, endpoints, service summary, network overview |
+| [Network Topology](docs/network-topology.md) | 4 physical networks, VXLAN overlay, provider net, traffic flows |
+| [HA & Load Balancer](docs/ha-and-loadbalancer.md) | Keepalived VRRP, HAProxy ports, Galera, RabbitMQ, failure scenarios |
+| [Storage Architecture](docs/storage-architecture.md) | Ceph pools, keyring placement, live migration, overcommit ratios |
+| [Service Placement](docs/service-placement.md) | Per-node container inventory — every service on every node |
+| [Operational Runbook](docs/operational-runbook.md) | Deploy procedure, Day-2 ops, health checks, common fixes |
+| [Mermaid Diagrams](docs/diagrams/README-diagrams.md) | 5 GitHub-rendered diagrams (topology, networks, HA, service deps, storage) |
+| [Interactive Visual](docs/diagrams/topology.html) | Single-file HTML poster — open in browser, works offline |
+
+**Open the interactive diagram locally:**
+```bash
+python3 -m http.server 8090 --directory docs/diagrams/
+# then visit http://localhost:8090/topology.html
+```
