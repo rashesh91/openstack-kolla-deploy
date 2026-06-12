@@ -1,4 +1,4 @@
-# Network Topology — Lintel Labs @ CtrlS Data Center
+# Network Topology
 
 ---
 
@@ -9,8 +9,8 @@ Four physical networks are cabled. Each node has four NICs (eno1–eno4).
 | Network | Interface | Subnet | Nodes | Purpose |
 |---------|-----------|--------|-------|---------|
 | **Management / API** | eno1 | 10.0.1.0/24 | All 10 nodes | SSH, Ansible, all OpenStack API traffic, Keepalived VRRP, HAProxy, Galera wsrep, RabbitMQ cluster, Memcached, noVNC |
-| **External / Provider** | eno2 | *no IP (untagged)* | ctrl01-03, compute01-04 | Attached to OVS `br-ex` bridge. Carries VM floating IP traffic (north-south). No IP assigned to the host. |
-| **Storage / VXLAN VTEP** | eno3 | 10.0.2.0/24 | All 10 nodes | Ceph public network (client → OSD), live migration, VXLAN tunnel endpoints (VTEPs) |
+| **External / Provider** | eno2 | *no IP (untagged)* | ctrl01-03, compute01-04 | Attached to OVN `br-ex` bridge. Carries VM floating IP traffic (north-south). No IP assigned to the host. |
+| **Storage / Geneve VTEP** | eno3 | 10.0.2.0/24 | All 10 nodes | Ceph public network (client → OSD), live migration, Geneve tunnel endpoints (VTEPs) |
 | **Ceph Replication** | eno4 | 10.0.3.0/24 | storage01-03 | Ceph OSD-to-OSD replication traffic *(wired but currently `cluster_interface = eno3` in globals.yml — see note below)* |
 
 > ⚠️ **cluster_interface discrepancy:**  
@@ -31,7 +31,7 @@ Four physical networks are cabled. Each node has four NICs (eno1–eno4).
 | ctrl03 | 10.0.1.13 | 10.0.2.13 | — |
 
 ### Compute Nodes
-| Node | eno1 (mgmt) | eno3 (VXLAN VTEP) |
+| Node | eno1 (mgmt) | eno3 (Geneve VTEP) |
 |------|-------------|-------------------|
 | compute01 | 10.0.1.21 | 10.0.2.21 |
 | compute02 | 10.0.1.22 | 10.0.2.22 |
@@ -47,26 +47,26 @@ Four physical networks are cabled. Each node has four NICs (eno1–eno4).
 
 ---
 
-## VXLAN Overlay Network
+## Geneve Overlay Network
 
-Tenant VMs communicate over a VXLAN overlay that runs on top of the eno3 physical network.
+Tenant VMs communicate over a Geneve overlay that runs on top of the eno3 physical network.  
+OVN uses Geneve as its default tunnel protocol (replaces VXLAN used by legacy ML2/OVS).
 
 | Parameter | Value |
 |-----------|-------|
-| Type driver | vxlan |
+| Type driver | geneve |
 | VNI range | 1 – 65535 |
-| UDP port | 4789 |
+| UDP port | 6081 |
 | VTEP addresses | eno3 IP of each controller and compute node |
-| L2 population | Enabled (`l2population` mechanism driver) |
-| ARP responder | Enabled (controllers answer ARP for known MACs, reducing flood) |
-| Default tenant type | vxlan (set in `neutron_tenant_network_types`) |
-| VXLAN multicast group | 239.1.1.1 |
+| L2/L3 | Handled natively by OVN (no separate DHCP/L3/metadata agents) |
+| ARP responder | Built into OVN (Logical Switch Port ARP responses) |
+| Default tenant type | geneve (set in `neutron_tenant_network_types`) |
 
 **How it works:**
-1. Tenant creates a network → Neutron assigns a VNI (e.g., VNI 5001)
-2. nova-compute on compute01 starts a VM → OVS agent programs flows: VM port → vxlan-5001 → VTEP on eno3
-3. Traffic is encapsulated in VXLAN UDP and sent to the destination compute node's VTEP
-4. L2 population prevents flood: Neutron informs all OVS agents of MAC→VTEP mappings
+1. Tenant creates a network → OVN Northbound DB records the logical switch
+2. `ovn_northd` translates to Southbound DB flows and distributes to all `ovn_controller` instances
+3. When a VM starts on compute01 → `ovn_controller` programs OVS flow tables: VM port → Geneve tunnel → VTEP on eno3
+4. Traffic is encapsulated in Geneve UDP and delivered directly to the destination compute node
 
 ---
 
@@ -75,8 +75,8 @@ Tenant VMs communicate over a VXLAN overlay that runs on top of the eno3 physica
 | Parameter | Value |
 |-----------|-------|
 | Physical network name | physnet1 |
-| OVS bridge | br-ex |
-| Physical NIC | eno2 (attached to br-ex via OVS) |
+| OVN bridge | br-ex |
+| Physical NIC | eno2 (attached to br-ex via OVN) |
 | Supported type drivers | flat, vlan |
 | VLAN range on physnet1 | 100–200 |
 | Flat network | Yes (the external floating-IP network uses flat mode) |
@@ -102,24 +102,22 @@ openstack subnet create --network public-net \
 ```
 VM on compute01                      VM on compute04
   │                                        │
-  └── OVS tap → VNI 5001 flow             └── OVS tap → VNI 5001 flow
+  └── OVN logical port → VNI 5001         └── OVN logical port → VNI 5001
         │                                        │
-        └── VXLAN encap (UDP 4789)               └── VXLAN decap
+        └── Geneve encap (UDP 6081)              └── Geneve decap
               │                                        ▲
               └── eno3 (10.0.2.21) ──────────────────── eno3 (10.0.2.24)
 ```
-Traffic never touches the controller. Controllers only send ARP replies via L2 population.
+Traffic never touches the controller. OVN distributes forwarding state to all `ovn_controller` instances.
 
 ### North-South (VM to Internet via floating IP)
 ```
 VM (10.10.0.5, private)
   │
-  └── OVS on compute01 → VXLAN → br-tun on ctrl01
+  └── OVN logical router on compute01 (distributed FIP — no controller hairpin)
           │
-          └── Neutron L3 agent (on ctrl01/02/03, HA)
-                │
-                ├── DNAT: floating IP 192.168.100.150 → 10.10.0.5
-                └── br-ex → eno2 (untagged) → physical switch → Internet
+          ├── DNAT: floating IP 192.168.100.150 → 10.10.0.5 (handled locally on compute)
+          └── br-ex → eno2 (untagged) → physical switch → Internet
 ```
 
 ### Live Migration (Nova compute to compute)
@@ -134,24 +132,24 @@ compute01 (source VM)                   compute02 (destination)
 
 ---
 
-## Neutron Agent Topology
+## Neutron OVN Topology
 
 ```
 Controllers (ctrl01, ctrl02, ctrl03)        Compute (compute01-04)
 ┌─────────────────────────────────────┐    ┌─────────────────────────┐
-│  neutron-server   (9696 on VIP)     │    │  neutron-openvswitch-   │
-│  neutron-dhcp-agent (HA, active on  │    │  agent                  │
-│    one controller, standby on rest) │    │  openvswitch_db         │
-│  neutron-l3-agent (HA active/stand) │    │  openvswitch_vswitchd   │
-│  neutron-metadata-agent             │    │                         │
-│  openvswitch_db                     │    │  br-int  br-tun         │
-│  openvswitch_vswitchd               │    │  (tap ports, VXLAN)     │
-│  br-int  br-ex  br-tun              │◄──►│                         │
-│  (router ports, SNAT/DNAT, DHCP ns) │    └─────────────────────────┘
-└─────────────────────────────────────┘
+│  neutron-server   (9696 on VIP)     │    │  ovn_controller         │
+│  ovn_northd  (NB→SB translation)   │    │  neutron_ovn_           │
+│  ovn_ovsdb_nb  (Northbound DB)      │    │  metadata_agent         │
+│  ovn_ovsdb_sb  (Southbound DB)      │    │  openvswitch_db         │
+│  openvswitch_db                     │    │  openvswitch_vswitchd   │
+│  openvswitch_vswitchd               │    │                         │
+│  br-int  br-ex                      │◄──►│  br-int  br-ex          │
+│  (OVN chassis, gateway ports)       │    │  (tap ports, Geneve)    │
+└─────────────────────────────────────┘    └─────────────────────────┘
 ```
 
-No dedicated network nodes — controllers serve the network role.  
+No dedicated network nodes — controllers serve as OVN gateway chassis.  
+L2/L3/DHCP handled natively by OVN (no separate dhcp-agent, l3-agent, or metadata-agent containers).  
 (`[network]` group in inventory/multinode = 10.0.1.11, 10.0.1.12, 10.0.1.13)
 
 ---
@@ -179,14 +177,14 @@ graph LR
         brex1 & brex2 & brex3 & brexC --> FIP
     end
 
-    subgraph eno3["eno3 — Storage/Ceph-Public + VXLAN VTEP  10.0.2.0/24"]
+    subgraph eno3["eno3 — Storage/Ceph-Public + Geneve VTEP  10.0.2.0/24"]
         direction TB
         TC1[ctrl01 VTEP] --- TC2[ctrl02 VTEP] --- TC3[ctrl03 VTEP]
         TN1[compute01 VTEP] --- TN2[compute02 VTEP]
         TN3[compute03 VTEP] --- TN4[compute04 VTEP]
         TS1[storage01 Ceph] --- TS2[storage02 Ceph] --- TS3[storage03 Ceph]
-        VXLAN["VXLAN overlay\nVNI 1-65535, UDP 4789"]
-        TC1 & TC2 & TC3 & TN1 & TN2 & TN3 & TN4 -.->|encapsulated| VXLAN
+        GENEVE["Geneve overlay\nVNI 1-65535, UDP 6081"]
+        TC1 & TC2 & TC3 & TN1 & TN2 & TN3 & TN4 -.->|encapsulated| GENEVE
     end
 
     subgraph eno4["eno4 — Ceph Replication  10.0.3.0/24  (cabled, unused by Kolla)"]

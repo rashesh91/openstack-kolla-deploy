@@ -1,4 +1,4 @@
-# Operational Runbook — Lintel Labs @ CtrlS Data Center
+# Operational Runbook
 
 Day-0 deployment, Day-1 verification, and Day-2 operations for the OpenStack cluster.
 
@@ -12,7 +12,7 @@ Run this before every fresh deploy or major reconfigure.
 - [ ] All 10 nodes are reachable from deploy01: `ansible -i inventory/multinode all -m ping`
 - [ ] All nodes have ≥ 200 GB free on `/var/lib/docker`
 - [ ] Time is in sync across all nodes (< 1s offset): `ansible all -m command -a "chronyc tracking"`
-- [ ] eno2 interface is UP and has no IP (will be used by OVS): `ip link show eno2`
+- [ ] eno2 interface is UP and has no IP (will be used by OVN br-ex): `ip link show eno2`
 - [ ] Root SSH access from deploy01 to all nodes (or `ubuntu` user with sudo)
 
 ### Ceph (External)
@@ -105,7 +105,7 @@ vim inventory/multinode
 # 2. Bootstrap the new node
 kolla-ansible -i inventory/multinode bootstrap-servers --limit 10.0.1.25
 
-# 3. Deploy nova-compute and OVS agent only
+# 3. Deploy nova-compute and OVN controller only
 kolla-ansible -i inventory/multinode deploy --limit 10.0.1.25
 
 # 4. Verify it appears in Nova
@@ -210,7 +210,7 @@ curl -s http://10.0.1.100:1984/stats;csv | awk -F, '{print $1,$2,$18}' | column 
 | Ceph `HEALTH_WARN clock skew` | NTP drift > 0.05s | `ansible all -m command -a "chronyc makestep"` |
 | MariaDB Galera split-brain | Network partition between controllers | `kolla-ansible -i inventory/multinode mariadb_recovery` |
 | RabbitMQ partition detected | Brief network outage | Reset minority node: `docker exec rabbitmq rabbitmqctl stop_app && rabbitmqctl reset && rabbitmqctl start_app` |
-| VMs can't get floating IPs | L3 agent down or br-ex misconfigured | `openstack network agent list` → check L3 agent; `ovs-vsctl show` on controller |
+| VMs can't get floating IPs | OVN gateway chassis down or br-ex misconfigured | `openstack network agent list` → check ovn-controller; `ovn-nbctl show` on controller |
 | `rbd_secret_uuid` error in Nova logs | Placeholder UUID not replaced | Set real UUID in `config/nova/nova.conf` + `kolla-ansible reconfigure --tags nova` |
 | Live migration fails with CPU incompatible | Source/dest compute have different CPUs | Ensure `cpu_allocation_ratio = host-passthrough` — all compute must be same CPU generation |
 | Galera node doesn't rejoin after restart | gcache expired (node was offline > gcache/rate) | `docker exec mariadb mysql -e "SET GLOBAL wsrep_provider_options='pc.bootstrap=YES'"` on surviving primary |
@@ -233,8 +233,12 @@ openstack floating ip list
 # Tenant networks and their VXLAN segment IDs
 openstack network list --long -c ID -c Name -c "Provider:Segmentation ID" -c "Provider:Network Type"
 
-# OVS flow tables on a compute node (tunnel table)
-ssh compute01 "ovs-ofctl dump-flows br-tun | head -30"
+# OVN logical topology
+ssh ctrl01 "docker exec ovn_northd ovn-nbctl show"
+
+# OVN chassis and tunnel state on a compute node
+ssh compute01 "ovs-vsctl show"
+ssh compute01 "docker exec ovn_controller ovn-appctl -t ovn-controller connection-status"
 
 # Check which controller holds the VIP
 for h in ctrl01 ctrl02 ctrl03; do echo -n "$h: "; ssh $h "ip addr show eno1 | grep 10.0.1.100 || echo no VIP"; done

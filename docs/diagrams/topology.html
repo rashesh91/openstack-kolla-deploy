@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Lintel Labs @ CtrlS — OpenStack Topology</title>
+<title>OpenStack Private Cloud — Topology</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#0f172a;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
@@ -131,8 +131,8 @@ svg{display:block;margin:0 auto}
 
 <div class="header">
   <div>
-    <h1>Lintel Labs <span>@ CtrlS Data Center</span></h1>
-    <div class="meta">OpenStack 2024.1 Caracal &nbsp;·&nbsp; Kolla-Ansible &nbsp;·&nbsp; 3 Controllers + 4 Compute + 3 Storage</div>
+    <h1>OpenStack <span>Private Cloud</span></h1>
+    <div class="meta">OpenStack 2024.1 Caracal &nbsp;·&nbsp; Kolla-Ansible &nbsp;·&nbsp; ML2/OVN &nbsp;·&nbsp; 3 Controllers + 4 Compute + 3 Storage</div>
   </div>
   <div class="vip-box">
     <div class="vip-pill">
@@ -258,11 +258,11 @@ svg{display:block;margin:0 auto}
         <div class="node-tags">
           <span class="tag tag-kvm">nova-compute</span>
           <span class="tag tag-kvm">libvirt/KVM</span>
-          <span class="tag tag-net">OVS Agent</span>
+          <span class="tag tag-net">OVN Controller</span>
           <span class="tag tag-mon">Node Exporter</span>
         </div>
         <div class="node-detail">
-          <strong>Containers:</strong> nova_compute, nova_libvirt, neutron_openvswitch_agent, openvswitch_db, openvswitch_vswitchd, prometheus_node_exporter, chrony<br>
+          <strong>Containers:</strong> nova_compute, nova_libvirt, ovn_controller, neutron_ovn_metadata_agent, openvswitch_db, openvswitch_vswitchd, prometheus_node_exporter, chrony<br>
           <strong>CPU allocation:</strong> 32 cores × 4.0 overcommit = 128 vCPU<br>
           <strong>RAM:</strong> 256 GB − 2 GB reserved = 254 GB available<br>
           <strong>Ephemeral disks:</strong> Stored in Ceph RBD pool "vms" (NOT local storage)<br>
@@ -279,7 +279,7 @@ svg{display:block;margin:0 auto}
         <div class="node-tags">
           <span class="tag tag-kvm">nova-compute</span>
           <span class="tag tag-kvm">libvirt/KVM</span>
-          <span class="tag tag-net">OVS Agent</span>
+          <span class="tag tag-net">OVN Controller</span>
         </div>
         <div class="node-detail">Identical to compute01. NICs: eno1=10.0.1.22 · eno3=10.0.2.22</div>
       </div>
@@ -292,7 +292,7 @@ svg{display:block;margin:0 auto}
         <div class="node-tags">
           <span class="tag tag-kvm">nova-compute</span>
           <span class="tag tag-kvm">libvirt/KVM</span>
-          <span class="tag tag-net">OVS Agent</span>
+          <span class="tag tag-net">OVN Controller</span>
         </div>
         <div class="node-detail">Identical to compute01. NICs: eno1=10.0.1.23 · eno3=10.0.2.23</div>
       </div>
@@ -305,7 +305,7 @@ svg{display:block;margin:0 auto}
         <div class="node-tags">
           <span class="tag tag-kvm">nova-compute</span>
           <span class="tag tag-kvm">libvirt/KVM</span>
-          <span class="tag tag-net">OVS Agent</span>
+          <span class="tag tag-net">OVN Controller</span>
         </div>
         <div class="node-detail">Identical to compute01. NICs: eno1=10.0.1.24 · eno3=10.0.2.24</div>
       </div>
@@ -403,10 +403,10 @@ svg{display:block;margin:0 auto}
     <text x="22" y="48" font-size="9" fill="#60a5fa">10.0.1.0/24 · SSH · OpenStack APIs · Keepalived VIP · Galera · RabbitMQ</text>
 
     <text x="22" y="172" font-size="11" fill="#fbbf24" font-weight="700">eno2 — External / Provider</text>
-    <text x="22" y="188" font-size="9" fill="#fcd34d">untagged, no IP · OVS br-ex · physnet1 · Floating IPs 192.168.100.0/24</text>
+    <text x="22" y="188" font-size="9" fill="#fcd34d">untagged, no IP · OVN br-ex · physnet1 · Floating IPs 192.168.100.0/24</text>
 
-    <text x="22" y="312" font-size="11" fill="#86efac" font-weight="700">eno3 — Storage / VXLAN VTEP</text>
-    <text x="22" y="328" font-size="9" fill="#4ade80">10.0.2.0/24 · Ceph public network · VXLAN endpoints (VTEPs) · Live migration</text>
+    <text x="22" y="312" font-size="11" fill="#86efac" font-weight="700">eno3 — Storage / Geneve VTEP</text>
+    <text x="22" y="328" font-size="9" fill="#4ade80">10.0.2.0/24 · Ceph public network · Geneve endpoints (VTEPs) · Live migration</text>
 
     <text x="22" y="452" font-size="11" fill="#d8b4fe" font-weight="700">eno4 — Ceph Cluster Replication</text>
     <text x="22" y="468" font-size="9" fill="#a78bfa">10.0.3.0/24 · cabled, not yet active (cluster_interface=eno3 in globals.yml)</text>
@@ -500,7 +500,7 @@ svg{display:block;margin:0 auto}
 
     <!-- VXLAN arch annotation -->
     <path d="M 260 355 Q 450 295 620 355" stroke="#f97316" stroke-width="2" fill="none" stroke-dasharray="5,3" marker-end="url(#arr-vxlan)"/>
-    <text x="450" y="322" text-anchor="middle" font-size="8" fill="#fb923c">VXLAN overlay VNI 1-65535 · UDP 4789</text>
+    <text x="450" y="322" text-anchor="middle" font-size="8" fill="#fb923c">Geneve overlay VNI 1-65535 · UDP 6081</text>
 
     <!-- eno4: only storage nodes -->
     <circle cx="640" cy="510" r="18" fill="#3b0764" stroke="#8b5cf6" stroke-width="2"/>
@@ -525,7 +525,7 @@ svg{display:block;margin:0 auto}
     <div class="leg"><div class="leg-dot" style="background:#f59e0b"></div> eno2 External/Provider</div>
     <div class="leg"><div class="leg-dot" style="background:#22c55e"></div> eno3 Storage/VXLAN</div>
     <div class="leg"><div class="leg-dot" style="background:#8b5cf6"></div> eno4 Ceph Replication (unused)</div>
-    <div class="leg"><div class="leg-dot" style="background:#f97316"></div> VXLAN overlay (tenant networks)</div>
+    <div class="leg"><div class="leg-dot" style="background:#f97316"></div> Geneve overlay (tenant networks, OVN)</div>
   </div>
 
 </div>
@@ -563,15 +563,15 @@ svg{display:block;margin:0 auto}
       </div>
     </div>
 
-    <div style="text-align:center;color:#4f46e5;font-size:1.5rem;padding:.25rem">↕ Nova API → nova-compute · Neutron Server → OVS Agent · Cinder API → cinder-volume</div>
+    <div style="text-align:center;color:#4f46e5;font-size:1.5rem;padding:.25rem">↕ Nova API → nova-compute · Neutron Server → OVN Controller · Cinder API → cinder-volume</div>
 
     <div class="swim swim-compute">
-      <div class="swim-head">🟢 Compute (compute01–04) — Nova hypervisor, OVS forwarding</div>
+      <div class="swim-head">🟢 Compute (compute01–04) — Nova hypervisor, OVN forwarding</div>
       <div class="swim-body">
         <span class="svc svc-kvm">🖥️ nova-compute<br>KVM/libvirt</span>
         <span class="svc svc-kvm">⚙️ libvirtd<br>VM daemon</span>
-        <span class="svc svc-net">🌐 neutron-ovs<br>agent</span>
-        <span class="svc svc-net">🔀 OVS<br>br-int/tun/ex</span>
+        <span class="svc svc-net">🌐 ovn-<br>controller</span>
+        <span class="svc svc-net">🔀 OVN<br>br-int/br-ex</span>
         <span class="svc svc-mon">📊 Node<br>Exporter</span>
         <div style="width:100%;font-size:.7rem;color:#64748b;margin-top:.5rem">
           CPU: 32 cores × 4.0 = 128 vCPU per node · RAM: 254 GB usable per node · Disk: Ceph RBD (no local ephemeral)
@@ -642,7 +642,7 @@ openstack network agent list</pre>
 </div>
 
 <div class="footer">
-  Lintel Labs @ CtrlS Data Center · OpenStack 2024.1 Caracal · Kolla-Ansible · rasheshpatel
+  OpenStack 2024.1 Caracal · Kolla-Ansible · ML2/OVN · rasheshpatel
 </div>
 
 <script>

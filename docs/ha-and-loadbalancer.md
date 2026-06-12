@@ -1,4 +1,4 @@
-# HA & Load Balancer — Lintel Labs @ CtrlS Data Center
+# HA & Load Balancer
 
 How the three controllers stay highly available: VIP management, load balancing,
 database replication, and message queue clustering.

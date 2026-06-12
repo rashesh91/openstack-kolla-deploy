@@ -1,4 +1,4 @@
-# Service Placement — Lintel Labs @ CtrlS Data Center
+# Service Placement
 
 Which Docker container runs on which physical node.  
 Source of truth: `inventory/multinode` + `globals.yml`.
@@ -49,14 +49,14 @@ All containers run on all three controllers simultaneously.
 | `nova_scheduler` | — | Placement decisions, filters hypervisors |
 | `nova_novncproxy` | 6080 | Browser-based console proxy (noVNC) |
 
-### Networking (Controllers act as Network nodes — no dedicated network node)
+### Networking (Controllers act as OVN Gateway Chassis — no dedicated network node)
 | Container | Purpose |
 |-----------|---------|
 | `neutron_server` | 9696 — Neutron API, subnet/port/router management |
-| `neutron_dhcp_agent` | Serves DHCP to tenant VMs (HA: multiple agents) |
-| `neutron_l3_agent` | Tenant router, floating IP DNAT/SNAT (HA active/standby) |
-| `neutron_metadata_agent` | Forwards cloud-init metadata requests to Nova |
-| `openvswitch_db` | OVS database daemon |
+| `ovn_northd` | Translates Neutron logical model (NB DB) → OVS flow rules (SB DB) |
+| `ovn_ovsdb_nb` | OVN Northbound DB — logical network state (Neutron writes here) |
+| `ovn_ovsdb_sb` | OVN Southbound DB — physical/flow state (ovn_controller reads here) |
+| `openvswitch_db` | OVS database daemon (OVN uses OVS as data plane) |
 | `openvswitch_vswitchd` | OVS forwarding daemon |
 
 ### Storage & Orchestration
@@ -96,13 +96,14 @@ All containers run on all three controllers simultaneously.
 |-----------|---------|
 | `nova_compute` | KVM/libvirt hypervisor, runs tenant VMs |
 | `nova_libvirt` | libvirtd daemon (Nova delegates VM operations here) |
-| `neutron_openvswitch_agent` | OVS agent — programs flow tables for tenant networks |
-| `openvswitch_db` | OVS database |
-| `openvswitch_vswitchd` | OVS forwarding |
+| `ovn_controller` | OVN compute agent — programs OVS flow tables from Southbound DB |
+| `neutron_ovn_metadata_agent` | Forwards cloud-init metadata requests to Nova |
+| `openvswitch_db` | OVS database (OVN uses OVS as data plane) |
+| `openvswitch_vswitchd` | OVS forwarding daemon |
 | `prometheus_node_exporter` | OS/hardware metrics |
 | `chrony` | NTP sync |
 
-**Total containers per compute node: ~7**
+**Total containers per compute node: ~8**
 
 ---
 
@@ -151,8 +152,8 @@ Nova API/Sched/Cond    ✓       ✓       ✓
 Nova Compute                                    ✓ (all 4)
 Nova noVNCProxy        ✓       ✓       ✓
 Neutron Server         ✓       ✓       ✓
-Neutron DHCP/L3/Meta   ✓       ✓       ✓
-Neutron OVS Agent      ✓       ✓       ✓         ✓ (all 4)
+OVN Northd/NB/SB DB    ✓       ✓       ✓
+OVN Controller                                    ✓ (all 4)
 Glance API             ✓       ✓       ✓
 Cinder API/Sched       ✓       ✓       ✓
 Cinder Volume                                                  ✓ (all 3)

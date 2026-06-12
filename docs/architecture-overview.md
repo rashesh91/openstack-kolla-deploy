@@ -1,5 +1,5 @@
-# Lintel Labs @ CtrlS Data Center
-## OpenStack 2024.1 Caracal — Architecture Overview
+# Architecture Overview
+## OpenStack 2024.1 Caracal
 
 > **Quick reference:** Everything you need to understand the deployment at a glance.  
 > For detailed deep-dives, see the linked documents at the bottom of this page.
@@ -10,8 +10,6 @@
 
 | Item | Value |
 |------|-------|
-| **Site** | CtrlS Data Center (Hyderabad) |
-| **Operator** | Lintel Technologies (Lintel Labs) |
 | **OpenStack release** | 2024.1 (Caracal) |
 | **Deployment tool** | Kolla-Ansible |
 | **Container base** | Ubuntu 22.04 (source builds) |
@@ -24,7 +22,7 @@
 | **TLS** | Disabled (termination at HAProxy — enable via `kolla_enable_tls_*`) |
 | **Storage backend** | External Ceph RBD (3-node, not Kolla-managed) |
 | **Hypervisor** | KVM + libvirt, cpu_mode=host-passthrough |
-| **Networking** | Neutron ML2/OVS + VXLAN overlay, L2-population, HA L3 |
+| **Networking** | Neutron ML2/OVN + Geneve overlay, distributed L3 |
 
 ---
 
@@ -36,10 +34,10 @@
 | ctrl01 | 10.0.1.11 | 16c / 64GB / 2×480GB SSD / 4 NICs | Controller — HA, all APIs, MariaDB, RabbitMQ |
 | ctrl02 | 10.0.1.12 | 16c / 64GB / 2×480GB SSD / 4 NICs | Controller — HA, all APIs, MariaDB, RabbitMQ |
 | ctrl03 | 10.0.1.13 | 16c / 64GB / 2×480GB SSD / 4 NICs | Controller — HA, all APIs, MariaDB, RabbitMQ |
-| compute01 | 10.0.1.21 | 32c / 256GB / 2×480GB SSD / 4 NICs | KVM hypervisor, Nova-Compute, Neutron OVS |
-| compute02 | 10.0.1.22 | 32c / 256GB / 2×480GB SSD / 4 NICs | KVM hypervisor, Nova-Compute, Neutron OVS |
-| compute03 | 10.0.1.23 | 32c / 256GB / 2×480GB SSD / 4 NICs | KVM hypervisor, Nova-Compute, Neutron OVS |
-| compute04 | 10.0.1.24 | 32c / 256GB / 2×480GB SSD / 4 NICs | KVM hypervisor, Nova-Compute, Neutron OVS |
+| compute01 | 10.0.1.21 | 32c / 256GB / 2×480GB SSD / 4 NICs | KVM hypervisor, Nova-Compute, Neutron OVN |
+| compute02 | 10.0.1.22 | 32c / 256GB / 2×480GB SSD / 4 NICs | KVM hypervisor, Nova-Compute, Neutron OVN |
+| compute03 | 10.0.1.23 | 32c / 256GB / 2×480GB SSD / 4 NICs | KVM hypervisor, Nova-Compute, Neutron OVN |
+| compute04 | 10.0.1.24 | 32c / 256GB / 2×480GB SSD / 4 NICs | KVM hypervisor, Nova-Compute, Neutron OVN |
 | storage01 | 10.0.1.31 | 8c / 32GB / 1×SSD + 3×4TB NVMe / 4 NICs | Ceph OSD, Cinder-Volume |
 | storage02 | 10.0.1.32 | 8c / 32GB / 1×SSD + 3×4TB NVMe / 4 NICs | Ceph OSD, Cinder-Volume |
 | storage03 | 10.0.1.33 | 8c / 32GB / 1×SSD + 3×4TB NVMe / 4 NICs | Ceph OSD, Cinder-Volume |
@@ -56,7 +54,7 @@
 |---------|----------|---------|
 | Keystone | 5000 | Identity, tokens, service catalog |
 | Nova | 8774 | Compute (KVM), VM lifecycle, live migration |
-| Neutron | 9696 | Networking (ML2/OVS, VXLAN, HA L3, floating IPs) |
+| Neutron | 9696 | Networking (ML2/OVN, Geneve, distributed L3, floating IPs) |
 | Glance | 9292 | VM image registry (Ceph RBD backend) |
 | Cinder | 8776 | Block volumes (Ceph RBD backend) |
 | Heat | 8004 | Orchestration via YAML templates |
@@ -152,7 +150,7 @@ Because Nova ephemeral disks are in Ceph, live migration moves **only RAM state*
 | Document | What it covers |
 |----------|---------------|
 | [Service Placement](service-placement.md) | Which container runs on which node |
-| [Network Topology](network-topology.md) | 4 physical networks, VXLAN overlay, provider networks, traffic flows |
+| [Network Topology](network-topology.md) | 4 physical networks, Geneve overlay (OVN), provider networks, traffic flows |
 | [HA & Load Balancer](ha-and-loadbalancer.md) | Keepalived VIP, HAProxy backends, Galera, RabbitMQ cluster |
 | [Storage Architecture](storage-architecture.md) | Ceph integration — pools, keyrings, live migration |
 | [Operational Runbook](operational-runbook.md) | Deploy steps, Day-2 ops, health check, troubleshooting |

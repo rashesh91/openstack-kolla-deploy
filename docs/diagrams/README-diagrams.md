@@ -1,4 +1,4 @@
-# Architecture Diagrams — Lintel Labs @ CtrlS Data Center
+# Architecture Diagrams
 
 GitHub renders these Mermaid diagrams natively in the web UI.  
 For an interactive visual version, open [topology.html](topology.html) in a browser.
@@ -9,7 +9,7 @@ For an interactive visual version, open [topology.html](topology.html) in a brow
 
 ```mermaid
 graph TD
-    subgraph CTRLS["🏢 CtrlS Data Center — Lintel Labs"]
+    subgraph CTRLS["🏢 OpenStack Private Cloud"]
 
         D["🖥️ deploy01\n10.0.1.10\nkolla-ansible\n(no containers)"]
 
@@ -28,10 +28,10 @@ graph TD
         IVIP --> EVIP
 
         subgraph COMP["Compute Nodes (×4)"]
-            N1["compute01\n10.0.1.21\nKVM · OVS"]
-            N2["compute02\n10.0.1.22\nKVM · OVS"]
-            N3["compute03\n10.0.1.23\nKVM · OVS"]
-            N4["compute04\n10.0.1.24\nKVM · OVS"]
+            N1["compute01\n10.0.1.21\nKVM · OVN"]
+            N2["compute02\n10.0.1.22\nKVM · OVN"]
+            N3["compute03\n10.0.1.23\nKVM · OVN"]
+            N4["compute04\n10.0.1.24\nKVM · OVN"]
         end
 
         subgraph STOR["Storage Nodes (×3)"]
@@ -79,7 +79,7 @@ graph LR
         TN1(compute01\nVTEP .21) --- TN2(compute02\nVTEP .22)
         TN3(compute03\nVTEP .23) --- TN4(compute04\nVTEP .24)
         TS1(storage01\nCeph .31) --- TS2(storage02\nCeph .32) --- TS3(storage03\nCeph .33)
-        VX["VXLAN Overlay\nVNI 1-65535\nUDP 4789"]
+        VX["Geneve Overlay\nVNI 1-65535\nUDP 6081"]
         TC1 & TC2 & TC3 & TN1 & TN2 & TN3 & TN4 -.->|encapsulated| VX
     end
 
@@ -115,7 +115,7 @@ graph TD
 
     subgraph COMP_SVC["Compute (×4)"]
         NC["🖥️ nova-compute\nKVM/libvirt"]
-        OVS["🌐 neutron-ovs-agent\nOVS"]
+        OVN_C["🌐 ovn-controller\nOVN"]
     end
 
     subgraph STOR_SVC["Storage (×3)"]
@@ -129,7 +129,7 @@ graph TD
     KS --> DB
     NOVA_S --> DB & MQ & MC & NC & GL & NEU_S
     NC --> CEPH
-    NEU_S --> DB & MQ & NEU_AG & OVS
+    NEU_S --> DB & MQ & OVN_C
     GL --> CEPH & DB
     CIN_S --> DB & MQ & CV
     CV --> CEPH

@@ -1,4 +1,4 @@
-# Storage Architecture — Lintel Labs @ CtrlS Data Center
+# Storage Architecture
 
 ---
 
